@@ -8,7 +8,8 @@ import {
     deleteTodo,
     toggleAllTodos,
     deleteAllTodos,
-    updateTodoStatus
+    updateTodoStatus,
+    updateTodo,
 } from './store/actions';
 import Service from './service';
 import {TodoStatus} from './models/todo';
@@ -16,11 +17,41 @@ import {isTodoCompleted} from './utils';
 
 type EnhanceTodoStatus = TodoStatus | 'ALL';
 
+/**
+ * Hook that alerts clicks outside of the passed ref
+ */
+function useOutsideAlerter(ref: any, clickOutsideCallback: () => void) {
+    useEffect(() => {
+        /**
+         * Alert if clicked on outside of element
+         */
+        function handleClickOutside(event: any) {
+            if (ref.current && !ref.current.contains(event.target)) {
+                clickOutsideCallback();
+            }
+        }
+
+        // Bind the event listener
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            // Unbind the event listener on clean up
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [ref, clickOutsideCallback]);
+}
 
 const ToDoPage = ({history}: RouteComponentProps) => {
     const [{todos}, dispatch] = useReducer(reducer, initialState);
     const [showing, setShowing] = useState<EnhanceTodoStatus>('ALL');
     const inputRef = useRef<HTMLInputElement>(null);
+    const editInputRef = useRef<HTMLInputElement>(null);
+    const [editId, setEditId] = useState('');
+
+    // if click outside edit input, hide it
+    const wrapperRef = useRef(null);
+    useOutsideAlerter(wrapperRef, () => {
+        setEditId('');
+    });
 
     useEffect(()=>{
         (async ()=>{
@@ -36,6 +67,23 @@ const ToDoPage = ({history}: RouteComponentProps) => {
                 const resp = await Service.createTodo(inputRef.current.value);
                 dispatch(createTodo(resp));
                 inputRef.current.value = '';
+            } catch (e) {
+                if (e.response.status === 401) {
+                    history.push('/')
+                }
+            }
+        }
+    }
+
+    // update todo when entering
+    const onUpdateTodo = async (e: React.KeyboardEvent<HTMLInputElement>, todoId: string) => {
+        if (e.key === 'Enter' && editInputRef.current) {
+            try {
+                const content = editInputRef.current.value;
+                const resp = await Service.updateTodo(todoId, content);
+                dispatch(updateTodo(todoId, resp.content));
+                editInputRef.current.value = '';
+                setEditId('');
             } catch (e) {
                 if (e.response.status === 401) {
                     history.push('/')
@@ -72,7 +120,7 @@ const ToDoPage = ({history}: RouteComponentProps) => {
     }, 0);
 
     return (
-        <div className="ToDo__container">
+        <div className="ToDo__container" ref={wrapperRef}>
             <div className="Todo__creation">
                 <input
                     ref={inputRef}
@@ -91,7 +139,26 @@ const ToDoPage = ({history}: RouteComponentProps) => {
                                     checked={isTodoCompleted(todo)}
                                     onChange={(e) => onUpdateTodoStatus(e, todo.id)}
                                 />
-                                <span>{todo.content}</span>
+                                {todo.id === editId ? (
+                                    <input
+                                        className="Todo__edit-input"
+                                        ref={editInputRef}
+                                        onKeyDown={(e) => onUpdateTodo(e, todo.id)}
+                                    />
+                                ) : (
+                                    <span
+                                        onDoubleClick={(e) => {
+                                            setEditId(todo.id);
+                                            setTimeout(() => {
+                                                if (editInputRef.current) {
+                                                    editInputRef.current.value = todo.content;
+                                                }
+                                            }, 10);
+                                        }}
+                                    >
+                                        {todo.content}
+                                    </span>
+                                )}
                                 <button
                                     className="Todo__delete"
                                     onClick={() => dispatch(deleteTodo(todo.id))}

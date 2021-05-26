@@ -5,7 +5,9 @@ import {
   DELETE_ALL_TODOS,
   DELETE_TODO,
   TOGGLE_ALL_TODOS,
-  UPDATE_TODO_STATUS
+  UPDATE_TODO_STATUS,
+  UPDATE_TODO,
+  SET_TODO
 } from './actions';
 
 export interface AppState {
@@ -19,6 +21,11 @@ export const initialState: AppState = {
 function reducer(state: AppState, action: AppActions): AppState {
   switch (action.type) {
     case CREATE_TODO:
+      // if id is existed, keep the state
+      // prevent duplication items
+      const index = state.todos.findIndex((todo) => todo.id === action.payload.id);
+      if (index !== -1) return state;
+
       state.todos.push(action.payload);
       return {
         ...state
@@ -28,6 +35,15 @@ function reducer(state: AppState, action: AppActions): AppState {
       const index2 = state.todos.findIndex((todo) => todo.id === action.payload.todoId);
       state.todos[index2].status = action.payload.checked ? TodoStatus.COMPLETED : TodoStatus.ACTIVE;
 
+      return {
+        ...state,
+        todos: state.todos
+      }
+
+    // handle update action
+    case UPDATE_TODO:
+      const index3 = state.todos.findIndex((todo) => todo.id === action.payload.todoId);
+      state.todos[index3].content = action.payload.content;
       return {
         ...state,
         todos: state.todos
@@ -59,9 +75,21 @@ function reducer(state: AppState, action: AppActions): AppState {
         ...state,
         todos: []
       }
+    case SET_TODO:
+      return {
+        ...state,
+        todos: action.payload
+      }
     default:
       return state;
   }
 }
 
-export default reducer;
+// save new state after changing
+function reducerWrapper(state: AppState, action: AppActions): AppState {
+  const newState = reducer(state, action);
+  localStorage.setItem('localstore', JSON.stringify(newState));
+  return newState;
+}
+
+export default reducerWrapper;

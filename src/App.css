@@ -121,5 +121,9 @@ input:focus {
   margin-right: 8px;
 }
 
+.Todo__edit-input {
+  width: 100%;
+}
+
 .Action__btn {
 }
